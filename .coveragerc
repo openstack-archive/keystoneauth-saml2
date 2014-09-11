@@ -1,0 +1,7 @@
+[run]
+branch = True
+source = keystoneclient_federation
+omit = keystoneclient_federation/tests/*,keystoneclient_federation/openstack/*
+
+[report]
+ignore-errors = True
