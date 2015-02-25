@@ -16,17 +16,67 @@ import uuid
 from keystoneclient import access
 from keystoneclient.auth.identity import v3
 from keystoneclient import exceptions
+from keystoneclient.i18n import _
 from lxml import etree
 from oslo.config import cfg
 from six.moves import urllib
 
-from keystoneclient_federation.i18n import _
+from keystoneclient_federation.v3 import federation
 
 
-class _BaseSAMLPlugin(v3.AuthConstructor):
+class _BaseSAMLPlugin(federation.FederatedAuthPlugin):
 
     HTTP_MOVED_TEMPORARILY = 302
-    PROTOCOL = 'saml2'
+
+    def __init__(self, auth_url,
+                 identity_provider, identity_provider_url,
+                 username, password, **kwargs):
+        """Class constructor accepting following parameters:
+
+        :param auth_url: URL of the Identity Service
+        :type auth_url: string
+
+        :param identity_provider: name of the Identity Provider the client
+                                  will authenticate against. This parameter
+                                  will be used to build a dynamic URL used to
+                                  obtain unscoped OpenStack token.
+        :type identity_provider: string
+
+        :param identity_provider_url: An Identity Provider URL, where the SAML2
+                                      authn request will be sent.
+        :type identity_provider_url: string
+
+        :param username: User's login
+        :type username: string
+
+        :param password: User's password
+        :type password: string
+
+        """
+        super(_BaseSAMLPlugin, self).__init__(
+            auth_url=auth_url, identity_provider=identity_provider,
+            identity_provider_url=identity_provider_url, **kwargs)
+        self.username = username
+        self.password = password
+
+    @property
+    def protocol(self):
+        return 'saml2'
+
+    @classmethod
+    def get_options(cls):
+        options = super(_BaseSAMLPlugin, cls).get_options()
+        options.extend([
+            cfg.StrOpt('user-name', dest='username', help='Username',
+                       deprecated_name='username'),
+            cfg.StrOpt('password', help='Password')
+        ])
+        return options
+
+    @property
+    def scoped_token_plugin(self):
+        """Return class that should be used for scoping the token."""
+        return Saml2ScopedToken
 
     @staticmethod
     def _first(_list):
@@ -49,35 +99,8 @@ class _BaseSAMLPlugin(v3.AuthConstructor):
     def xml_to_str(content, **kwargs):
         return etree.tostring(content, **kwargs)
 
-    @property
-    def token_url(self):
-        """Return full URL where authorization data is sent."""
-        values = {
-            'host': self.auth_url.rstrip('/'),
-            'identity_provider': self.identity_provider,
-            'protocol': self.PROTOCOL
-        }
-        url = ("%(host)s/OS-FEDERATION/identity_providers/"
-               "%(identity_provider)s/protocols/%(protocol)s/auth")
-        url = url % values
 
-        return url
-
-    @classmethod
-    def get_options(cls):
-        options = super(_BaseSAMLPlugin, cls).get_options()
-        options.extend([
-            cfg.StrOpt('identity-provider', help="Identity Provider's name"),
-            cfg.StrOpt('identity-provider-url',
-                       help="Identity Provider's URL"),
-            cfg.StrOpt('user-name', dest='username', help='Username',
-                       deprecated_name='username'),
-            cfg.StrOpt('password', help='Password')
-        ])
-        return options
-
-
-class Saml2UnscopedTokenAuthMethod(v3.AuthMethod):
+class Saml2TokenAuthMethod(v3.AuthMethod):
     _method_parameters = []
 
     def get_auth_data(self, session, auth, headers, **kwargs):
@@ -85,7 +108,7 @@ class Saml2UnscopedTokenAuthMethod(v3.AuthMethod):
                                                 'be called'))
 
 
-class Saml2UnscopedToken(_BaseSAMLPlugin):
+class Saml2Token(_BaseSAMLPlugin):
     """Implement authentication plugin for SAML2 protocol.
 
     ECP stands for `Enhanced Client or Proxy` and is a SAML2 extension
@@ -122,7 +145,7 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
 
     """
 
-    _auth_method_class = Saml2UnscopedTokenAuthMethod
+    _auth_method_class = Saml2TokenAuthMethod
 
     SAML2_HEADER_INDEX = 0
     ECP_SP_EMPTY_REQUEST_HEADERS = {
@@ -167,10 +190,32 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
                  identity_provider_url,
                  username, password,
                  **kwargs):
-        super(Saml2UnscopedToken, self).__init__(auth_url=auth_url, **kwargs)
-        self.identity_provider = identity_provider
-        self.identity_provider_url = identity_provider_url
-        self.username, self.password = username, password
+        """Class constructor accepting following parameters:
+
+        :param auth_url: URL of the Identity Service
+        :type auth_url: string
+
+        :param identity_provider: name of the Identity Provider the client
+                                  will authenticate against. This parameter
+                                  will be used to build a dynamic URL used to
+                                  obtain unscoped OpenStack token.
+        :type identity_provider: string
+
+        :param identity_provider_url: An Identity Provider URL, where the SAML2
+                                      authn request will be sent.
+        :type identity_provider_url: string
+
+        :param username: User's login
+        :type username: string
+
+        :param password: User's password
+        :type password: string
+
+        """
+        super(Saml2Token, self).__init__(
+            auth_url=auth_url, identity_provider=identity_provider,
+            identity_provider_url=identity_provider_url,
+            username=username, password=password, **kwargs)
 
     def _handle_http_302_ecp_redirect(self, session, response, method,
                                       **kwargs):
@@ -334,21 +379,20 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
 
         self.authenticated_response = response
 
-    def _get_unscoped_token(self, session):
+    def get_unscoped_auth_ref(self, session):
         """Get unscoped OpenStack token after federated authentication.
 
         This is a multi-step process including multiple HTTP requests.
 
-        The federated authentication consists of::
+        The federated authentication consists of:
+
         * HTTP GET request to the Identity Service (acting as a Service
-          Provider). Client utilizes URL::
-          ``/v3/OS-FEDERATION/identity_providers/{identity_provider}/
-          protocols/saml2/auth``.
-          It's crucial to include HTTP headers indicating we are expecting
-          SOAP message in return.
-          Service Provider should respond with such SOAP message.
-          This step is handed by a method
-          ``Saml2UnscopedToken_send_service_provider_request()``
+          Provider).
+
+          It's crucial to include HTTP headers indicating we are expecting SOAP
+          message in return. Service Provider should respond with such SOAP
+          message.  This step is handed by a method
+          ``Saml2Token_send_service_provider_request()``.
 
         * HTTP POST request to the external Identity Provider service with
           ECP extension enabled. The content sent is a header removed SOAP
@@ -359,7 +403,7 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
           Upon successful authentication the user should receive a SAML2
           assertion.
           This step is handed by a method
-          ``Saml2UnscopedToken_send_idp_saml2_authn_request(session)``
+          ``Saml2Token_send_idp_saml2_authn_request(session)``
 
         * HTTP POST request again to the Service Provider. The body of the
           request includes SAML2 assertion issued by a trusted Identity
@@ -370,7 +414,7 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
           Provider will issue an unscoped token with a list of groups the
           federated user is a member of.
           This step is handed by a method
-          ``Saml2UnscopedToken_send_service_provider_saml2_authn_response()``
+          ``Saml2Token_send_service_provider_saml2_authn_response()``
 
           Unscoped token example::
 
@@ -398,70 +442,24 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
         :param session : a session object to send out HTTP requests.
         :type session: keystoneclient.session.Session
 
-        :returns: (token, token_json)
-
+        :returns: AccessInfo
+        :rtype: :py:class:`keystoneclient.access.AccessInfo`
         """
         saml_authenticated = self._send_service_provider_request(session)
         if not saml_authenticated:
             self._send_idp_saml2_authn_request(session)
             self._send_service_provider_saml2_authn_response(session)
-        return (self.authenticated_response.headers['X-Subject-Token'],
-                self.authenticated_response.json()['token'])
 
-    def get_auth_ref(self, session, **kwargs):
-        """Authenticate via SAML2 protocol and retrieve unscoped token.
+        token = self.authenticated_response.headers['X-Subject-Token']
+        token_json = self.authenticated_response.json()['token']
 
-        This is a multi-step process where a client does federated authn
-        receives an unscoped token.
-
-        Federated authentication utilizing SAML2 Enhanced Client or Proxy
-        extension. See ``Saml2UnscopedToken_get_unscoped_token()``
-        for more information on that step.
-        Upon successful authentication and assertion mapping an
-        unscoped token is returned and stored within the plugin object for
-        further use.
-
-        :param session : a session object to send out HTTP requests.
-        :type session: keystoneclient.session.Session
-
-        :return: an object with scoped token's id and unscoped token json
-                 included.
-        :rtype: :py:class:`keystoneclient.access.AccessInfoV3`
-
-        """
-        token, token_json = self._get_unscoped_token(session)
         return access.AccessInfoV3(token, **token_json)
 
 
-class ADFSUnscopedToken(_BaseSAMLPlugin):
-    """Authentication plugin for Microsoft ADFS2.0 IdPs.
+class ADFSToken(_BaseSAMLPlugin):
+    """Authentication plugin for Microsoft ADFS2.0 IdPs."""
 
-    :param auth_url: URL of the Identity Service
-    :type auth_url: string
-
-    :param identity_provider: name of the Identity Provider the client will
-                              authenticate against. This parameter will be used
-                              to build a dynamic URL used to obtain unscoped
-                              OpenStack token.
-    :type identity_provider: string
-
-    :param identity_provider_url: An Identity Provider URL, where the SAML2
-                                  authentication request will be sent.
-    :type identity_provider_url: string
-
-    :param service_provider_endpoint: Endpoint where an assertion is being
-        sent, for instance: ``https://host.domain/Shibboleth.sso/ADFS``
-    :type service_provider_endpoint: string
-
-    :param username: User's login
-    :type username: string
-
-    :param password: User's password
-    :type password: string
-
-    """
-
-    _auth_method_class = Saml2UnscopedTokenAuthMethod
+    _auth_method_class = Saml2TokenAuthMethod
 
     DEFAULT_ADFS_TOKEN_EXPIRATION = 120
 
@@ -485,15 +483,43 @@ class ADFSUnscopedToken(_BaseSAMLPlugin):
 
     def __init__(self, auth_url, identity_provider, identity_provider_url,
                  service_provider_endpoint, username, password, **kwargs):
-        super(ADFSUnscopedToken, self).__init__(auth_url=auth_url, **kwargs)
-        self.identity_provider = identity_provider
-        self.identity_provider_url = identity_provider_url
+        """Constructor for ``ADFSToken``.
+
+        :param auth_url: URL of the Identity Service
+        :type auth_url: string
+
+        :param identity_provider: name of the Identity Provider the client
+                                  will authenticate against. This parameter
+                                  will be used to build a dynamic URL used to
+                                  obtain unscoped OpenStack token.
+        :type identity_provider: string
+
+        :param identity_provider_url: An Identity Provider URL, where the SAML2
+                                      authentication request will be sent.
+        :type identity_provider_url: string
+
+        :param service_provider_endpoint: Endpoint where an assertion is being
+            sent, for instance: ``https://host.domain/Shibboleth.sso/ADFS``
+        :type service_provider_endpoint: string
+
+        :param username: User's login
+        :type username: string
+
+        :param password: User's password
+        :type password: string
+
+        """
+
+        super(ADFSToken, self).__init__(
+            auth_url=auth_url, identity_provider=identity_provider,
+            identity_provider_url=identity_provider_url,
+            username=username, password=password)
+
         self.service_provider_endpoint = service_provider_endpoint
-        self.username, self.password = username, password
 
     @classmethod
     def get_options(cls):
-        options = super(ADFSUnscopedToken, cls).get_options()
+        options = super(ADFSToken, cls).get_options()
 
         options.extend([
             cfg.StrOpt('service-provider-endpoint',
@@ -802,40 +828,40 @@ class ADFSUnscopedToken(_BaseSAMLPlugin):
         self.authenticated_response = session.get(self.token_url,
                                                   authenticated=False)
 
-    def _get_unscoped_token(self, session, *kwargs):
+    def get_unscoped_auth_ref(self, session, *kwargs):
         """Retrieve unscoped token after authentcation with ADFS server.
 
-        This is a multistep process::
+        This is a multistep process:
 
         * Prepare ADFS Request Securty Token -
-        build a etree.XML object filling certain attributes with proper user
-        credentials, created/expires dates (ticket is be valid for 120 seconds
-        as currently we don't handle reusing ADFS issued security tokens) .
-        Step handled by ``ADFSUnscopedToken._prepare_adfs_request()`` method.
+          build a etree.XML object filling certain attributes with proper user
+          credentials, created/expires dates (ticket is be valid for 120
+          seconds as currently we don't handle reusing ADFS issued security
+          tokens).
 
         * Send ADFS Security token to the ADFS server. Step handled by
-        ``ADFSUnscopedToken._get_adfs_security_token()`` method.
 
         * Receive and parse security token, extract actual SAML assertion and
-        prepare a request addressed for the Service Provider endpoint.
-        This also includes changing namespaces in the XML document. Step
-        handled by ``ADFSUnscopedToken._prepare_sp_request()`` method.
+          prepare a request addressed for the Service Provider endpoint.
+          This also includes changing namespaces in the XML document. Step
+          handled by ``ADFSToken._prepare_sp_request()`` method.
 
         * Send prepared assertion to the Service Provider endpoint. Usually
-        the server will respond with HTTP 301 code which should be ignored as
-        the 'location' header doesn't contain protected area. The goal of this
-        operation is fetching the session cookie which later allows for
-        accessing protected URL endpoints. Step handed by
-        ``ADFSUnscopedToken._send_assertion_to_service_provider()`` method.
+          the server will respond with HTTP 301 code which should be ignored as
+          the 'location' header doesn't contain protected area. The goal of
+          this operation is fetching the session cookie which later allows for
+          accessing protected URL endpoints. Step handed by
+          ``ADFSToken._send_assertion_to_service_provider()`` method.
 
         * Once the session cookie is issued, the protected endpoint can be
-        accessed and an unscoped token can be retrieved. Step handled by
-        ``ADFSUnscopedToken._access_service_provider()`` method.
+          accessed and an unscoped token can be retrieved. Step handled by
+          ``ADFSToken._access_service_provider()`` method.
 
-        :param session : a session object to send out HTTP requests.
+        :param session: a session object to send out HTTP requests.
         :type session: keystoneclient.session.Session
 
-        :returns: (Unscoped federated token, token JSON body)
+        :returns: AccessInfo
+        :rtype: :py:class:`keystoneclient.access.AccessInfo`
 
         """
         self._prepare_adfs_request()
@@ -845,14 +871,12 @@ class ADFSUnscopedToken(_BaseSAMLPlugin):
         self._access_service_provider(session)
 
         try:
-            return (self.authenticated_response.headers['X-Subject-Token'],
-                    self.authenticated_response.json()['token'])
+            token = self.authenticated_response.headers['X-Subject-Token']
+            token_json = self.authenticated_response.json()['token']
         except (KeyError, ValueError):
             raise exceptions.InvalidResponse(
                 response=self.authenticated_response)
 
-    def get_auth_ref(self, session, **kwargs):
-        token, token_json = self._get_unscoped_token(session)
         return access.AccessInfoV3(token, **token_json)
 
 
@@ -872,9 +896,3 @@ class Saml2ScopedToken(v3.Token):
     """Class for scoping unscoped saml2 token."""
 
     _auth_method_class = Saml2ScopedTokenMethod
-
-    def __init__(self, auth_url, token, **kwargs):
-        super(Saml2ScopedToken, self).__init__(auth_url, token, **kwargs)
-        if not (self.project_id or self.domain_id):
-            raise exceptions.ValidationError(
-                _('Neither project nor domain specified'))
