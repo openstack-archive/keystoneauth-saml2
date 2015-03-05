@@ -432,6 +432,169 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
         token, token_json = self._get_unscoped_token(session)
         return access.AccessInfoV3(token, **token_json)
 
+class Saml2KeystoneUnscoped(_BaseSAMLPlugin):
+    """Authentication plugin to accept SAML2 assertions from a keystone IdP
+
+    The parameters sp_auth_url and sp_url can be obtained from
+    the token or from the HTTP headers in the response with the
+    samlized token.
+
+    :param sp_auth_url: auth URL of the SP (remote) Keystone
+    :type sp_auth_url: string
+
+    :param sp_url: url where the saml2 assertion will be presented to the
+                   SP (remote) Keystone
+    :type identity_provider_url: string
+
+    :param saml2: A saml2 assertion obtained from a keystone idp by calling
+                  client.federation.saml.samlize_token
+    :type saml2: string
+    """
+
+    _auth_method_class = Saml2UnscopedTokenAuthMethod
+
+    ECP_SP_SAML2_REQUEST_HEADERS = {
+        'Content-Type': 'application/vnd.paos+xml'
+    }
+
+    def __init__(self, sp_auth_url,
+                 sp_url,
+                 saml,
+                 **kwargs):
+        auth_url = sp_auth_url.split("/OS-FEDERATION")[0]
+        super(Saml2KeystoneUnscoped, self).__init__(auth_url=auth_url, **kwargs)
+        self.sp_url = sp_url
+        self.saml = saml
+        self.identity_provider = ""
+        self.sp_auth_url=sp_auth_url
+
+    def _send_service_provider_saml2_authn_response(self, session):
+        """Present SAML2 assertion to the Service Provider.
+
+        The assertion is issued by a trusted Identity Provider for the
+        authenticated user. This function directs the HTTP request to SP
+        managed URL, for instance: ``https://<host>:<port>/Shibboleth.sso/
+        SAML2/ECP``.
+        Upon success the there's a session created and access to the protected
+        resource is granted. Many implementations of the SP return HTTP 302
+        status code pointing to the protected URL (``https://<host>:<port>/v3/
+        OS-FEDERATION/identity_providers/{identity_provider}/protocols/
+        {protocol_id}/auth`` in this case). Saml2 plugin should point to that
+        URL again, with HTTP GET method, expecting an unscoped token.
+
+        :param session: a session object to send out HTTP requests.
+
+        """
+
+        response = session.post(
+            self.sp_url,
+            headers=self.ECP_SP_SAML2_REQUEST_HEADERS,
+            data=self._get_ecp(),
+            authenticated=False, redirect=False)
+
+        # Don't follow HTTP specs - after the HTTP 302 response don't repeat
+        # the call directed to the Location URL. In this case, this is an
+        # indication that saml2 session is now active and protected resource
+        # can be accessed.
+        if response.status_code == self.HTTP_MOVED_TEMPORARILY:
+            response = session.request(self.sp_auth_url, 'GET', authenticated=False,
+                                       headers=self.ECP_SP_SAML2_REQUEST_HEADERS)
+
+        self.authenticated_response = response
+
+    def _get_ecp(self):
+        """Put the saml assertion in an envelope"""
+        SOAP_NAMESPACES = {
+            'soap11': 'http://schemas.xmlsoap.org/soap/envelope/',
+            'ecp': 'urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp',
+            'samlec': 'urn:ietf:params:xml:ns:samlec',
+        }
+        root = etree.Element('{http://schemas.xmlsoap.org/soap/envelope/}Envelope',
+                             nsmap=SOAP_NAMESPACES)
+        header = etree.SubElement(root, '{http://schemas.xmlsoap.org/soap/envelope/}Header')
+        relay_state = etree.SubElement(header,
+                                       '{urn:oasis:names:tc:SAML:2.0:profiles:SSO:ecp}RelayState')
+        relay_state.set('{http://schemas.xmlsoap.org/soap/envelope/}actor',
+                        'http://schemas.xmlsoap.org/soap/actor/next')
+        relay_state.set('{http://schemas.xmlsoap.org/soap/envelope/}mustUnderstand', '1')
+        # TODO(doug-fish): what's the right way to generate this text
+        relay_state.text = 'ss:mem:f88cd8ad5aeee3456e74900b306b5ed54ec9fb23c614f9fa73ece1c97ec004ed'
+
+        generated_key = etree.SubElement(header,
+                                         '{urn:ietf:params:xml:ns:samlec}GeneratedKey')
+        generated_key.set('{http://schemas.xmlsoap.org/soap/envelope/}actor',
+                          'http://schemas.xmlsoap.org/soap/actor/next')
+        # TODO(doug-fish): what's the right way to generate this text
+        generated_key.text = 'yvYbdh49qSJ7LqjFv+rfB8SR97hPWMwQkL0KKOgSkhY='
+
+        body = etree.SubElement(root, '{http://schemas.xmlsoap.org/soap/envelope/}Body')
+        body.text="{0}"
+     
+        # TODO(doug-fish): I suspect there is a better way to use lxml to combine these
+        # two documents, but I couldn't sort it out.  Resorting to string formatting for now.
+        saml = '\n'.join(self.saml.split('\n')[1:])
+        saml = saml.replace('\n', '')
+        ecp = self.xml_to_str(root).format(saml)
+        return ecp
+
+    def _get_unscoped_token(self, session):
+        """Get unscoped OpenStack token after federated authentication.
+
+          Unscoped token example::
+
+            {
+                "token": {
+                    "methods": [
+                        "saml2"
+                    ],
+                    "user": {
+                        "id": "username%40example.com",
+                        "name": "username@example.com",
+                        "OS-FEDERATION": {
+                            "identity_provider": "ACME",
+                            "protocol": "saml2",
+                            "groups": [
+                                {"id": "abc123"},
+                                {"id": "bcd234"}
+                            ]
+                        }
+                    }
+                }
+            }
+
+
+        :param session : a session object to send out HTTP requests.
+        :type session: keystoneclient.session.Session
+
+        :returns: (token, token_json)
+
+        """
+        self._send_service_provider_saml2_authn_response(session)
+        return (self.authenticated_response.headers['X-Subject-Token'],
+                self.authenticated_response.json()['token'])
+
+    def get_auth_ref(self, session, **kwargs):
+        """Authenticate via SAML2 protocol and retrieve unscoped token.
+
+        This is a multi-step process where a client presents a saml assertion
+        and receives an unscoped token.
+
+        Upon successful authentication and assertion mapping an
+        unscoped token is returned and stored within the plugin object for
+        further use.
+
+        :param session : a session object to send out HTTP requests.
+        :type session: keystoneclient.session.Session
+
+        :return: an object with scoped token's id and unscoped token json
+                 included.
+        :rtype: :py:class:`keystoneclient.access.AccessInfoV3`
+
+        """
+        token, token_json = self._get_unscoped_token(session)
+        return access.AccessInfoV3(token,
+                                   **token_json)
+
 
 class ADFSUnscopedToken(_BaseSAMLPlugin):
     """Authentication plugin for Microsoft ADFS2.0 IdPs.
