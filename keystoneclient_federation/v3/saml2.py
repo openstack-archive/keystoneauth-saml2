@@ -433,6 +433,138 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
         return access.AccessInfoV3(token, **token_json)
 
 
+class Saml2KeystoneUnscoped(_BaseSAMLPlugin):
+    """Authentication plugin to accept ECP SAML assertions from a keystone IdP.
+
+    The parameters sp_auth_url and sp_url can be obtained from
+    the token or from the HTTP headers in the response with the
+    samlized token.
+
+    :param auth_url: URL of the Identity Service
+    :type auth_url: string
+
+    :param sp_url: url where the ECP wrapped SAML assertion will be presented
+                   to the SP (remote) Keystone
+    :type sp_url: string
+
+    :param sp_auth_url: auth URL of the SP (remote) Keystone
+    :type sp_auth_url: string
+
+
+    :param ecp_assertion: An ECP wrapped SAML assertion obtained from a
+                          keystone IdP by calling
+                          client.federation.saml.create_ecp_assertion
+    :type ecp_assertion: string
+
+    """
+
+    _auth_method_class = Saml2UnscopedTokenAuthMethod
+
+    ECP_SP_SAML2_REQUEST_HEADERS = {
+        'Content-Type': 'application/vnd.paos+xml'
+    }
+
+    def __init__(self, auth_url, sp_url, sp_auth_url, ecp_assertion, **kwargs):
+        super(Saml2KeystoneUnscoped, self).__init__(auth_url=auth_url,
+                                                    **kwargs)
+        self.sp_url = sp_url
+        self.sp_auth_url = sp_auth_url
+        self.ecp_assertion = ecp_assertion
+
+    def _send_service_provider_ecp_authn_response(self, session):
+        """Present ECP SAML2 assertion to the Service Provider.
+
+        The assertion is issued by a trusted Identity Provider for the
+        authenticated user. This function directs the HTTP request to SP
+        managed URL, for instance: ``https://<host>:<port>/Shibboleth.sso/
+        SAML2/ECP``.
+        Upon success the there's a session created and access to the protected
+        resource is granted. Many implementations of the SP return HTTP 302
+        status code pointing to the protected URL (``https://<host>:<port>/v3/
+        OS-FEDERATION/identity_providers/{identity_provider}/protocols/
+        {protocol_id}/auth`` in this case). The plugin should point to that
+        URL again, with HTTP GET method, expecting an unscoped token.
+
+        :param session: a session object to send out HTTP requests.
+
+        """
+
+        response = session.post(
+            self.sp_url,
+            headers=self.ECP_SP_SAML2_REQUEST_HEADERS,
+            data=self.ecp_assertion,
+            authenticated=False,
+            redirect=False)
+
+        # Don't follow HTTP specs - after the HTTP 302 response don't repeat
+        # the call directed to the Location URL. In this case, this is an
+        # indication that SAML2 session is now active and protected resource
+        # can be accessed.
+        if response.status_code == self.HTTP_MOVED_TEMPORARILY:
+            response = session.request(
+                self.sp_auth_url, 'GET', authenticated=False,
+                headers=self.ECP_SP_SAML2_REQUEST_HEADERS)
+        self.authenticated_response = response
+
+    def _get_unscoped_token(self, session):
+        """Get unscoped OpenStack token after federated authentication.
+
+          Unscoped token example::
+
+            {
+                "token": {
+                    "methods": [
+                        "saml2"
+                    ],
+                    "user": {
+                        "id": "username%40example.com",
+                        "name": "username@example.com",
+                        "OS-FEDERATION": {
+                            "identity_provider": "ACME",
+                            "protocol": "saml2",
+                            "groups": [
+                                {"id": "abc123"},
+                                {"id": "bcd234"}
+                            ]
+                        }
+                    }
+                }
+            }
+
+
+        :param session : a session object to send out HTTP requests.
+        :type session: keystoneclient.session.Session
+
+        :returns: (token, token_json)
+
+        """
+        self._send_service_provider_ecp_authn_response(session)
+        return (self.authenticated_response.headers['X-Subject-Token'],
+                self.authenticated_response.json()['token'])
+
+    def get_auth_ref(self, session, **kwargs):
+        """Authenticate via SAML2 protocol and retrieve unscoped token.
+
+        This is a multi-step process where a client presents a saml assertion
+        and receives an unscoped token.
+
+        Upon successful authentication and assertion mapping an
+        unscoped token is returned and stored within the plugin object for
+        further use.
+
+        :param session : a session object to send out HTTP requests.
+        :type session: keystoneclient.session.Session
+
+        :return: an object with scoped token's id and unscoped token json
+                 included.
+        :rtype: :py:class:`keystoneclient.access.AccessInfoV3`
+
+        """
+        token, token_json = self._get_unscoped_token(session)
+        return access.AccessInfoV3(token,
+                                   **token_json)
+
+
 class ADFSUnscopedToken(_BaseSAMLPlugin):
     """Authentication plugin for Microsoft ADFS2.0 IdPs.
 
