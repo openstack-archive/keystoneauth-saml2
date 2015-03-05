@@ -433,6 +433,80 @@ class Saml2UnscopedToken(_BaseSAMLPlugin):
         return access.AccessInfoV3(token, **token_json)
 
 
+class Saml2KeystoneUnscoped(_BaseSAMLPlugin):
+    """Authentication plugin to accept ECP SAML assertions from a keystone IdP.
+
+    The parameters sp_auth_url and sp_url can be obtained from
+    the token or from the HTTP headers in the response with the
+    samlized token.
+
+    :param sp_url: URL where the ECP wrapped SAML assertion will be presented
+                   to the SP (remote) Keystone.
+    :type sp_url: string
+
+    :param sp_auth_url: Auth URL of the SP (remote) keystone.
+    :type sp_auth_url: string
+
+
+    :param ecp_assertion: An ECP wrapped SAML assertion obtained from a
+                          keystone IdP by calling
+                          /auth/OS-FEDERATION/saml2/ecp.
+    :type ecp_assertion: string
+
+    """
+
+    _auth_method_class = Saml2UnscopedTokenAuthMethod
+
+    # TODO(rodrigods): This should be common to the classes in this file
+    ECP_SP_SAML2_REQUEST_HEADERS = {
+        'Content-Type': 'application/vnd.paos+xml'
+    }
+
+    def __init__(self, sp_url, sp_auth_url, ecp_assertion, **kwargs):
+        super(Saml2KeystoneUnscoped, self).__init__(auth_url='',
+                                                    **kwargs)
+        self.sp_url = sp_url
+        self.sp_auth_url = sp_auth_url
+        self.ecp_assertion = ecp_assertion
+
+    def _send_service_provider_ecp_authn_response(self, session):
+        """Present an ECP wrapped SAML2 assertion to the Service Provider.
+
+        See
+        :func:`Saml2UnscopedToken._send_service_provider_saml2_authn_response`.
+
+        """
+
+        response = session.post(
+            self.sp_url,
+            headers=self.ECP_SP_SAML2_REQUEST_HEADERS,
+            data=self.ecp_assertion,
+            authenticated=False,
+            redirect=False)
+
+        # Don't follow HTTP specs - after the HTTP 302 response don't repeat
+        # the call directed to the Location URL. In this case, this is an
+        # indication that SAML2 session is now active and protected resource
+        # can be accessed.
+        if response.status_code == self.HTTP_MOVED_TEMPORARILY:
+            response = session.request(
+                self.sp_auth_url, 'GET', authenticated=False,
+                headers=self.ECP_SP_SAML2_REQUEST_HEADERS)
+        self.authenticated_response = response
+
+    def _get_unscoped_token(self, session):
+        """See :func:`Saml2UnscopedToken._get_unscoped_token`."""
+        self._send_service_provider_ecp_authn_response(session)
+        return (self.authenticated_response.headers['X-Subject-Token'],
+                self.authenticated_response.json()['token'])
+
+    def get_auth_ref(self, session, **kwargs):
+        """See :func:`Saml2UnscopedToken.get_auth_ref`."""
+        token, token_json = self._get_unscoped_token(session)
+        return access.AccessInfoV3(token,
+                                   **token_json)
+
+
 class ADFSUnscopedToken(_BaseSAMLPlugin):
     """Authentication plugin for Microsoft ADFS2.0 IdPs.
 
