@@ -647,3 +647,58 @@ class AuthenticateviaADFSTests(base.TestCase):
         token, token_json = self.adfsplugin._get_unscoped_token(self.session)
         self.assertEqual(token, client_fixtures.AUTH_SUBJECT_TOKEN)
         self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN['token'], token_json)
+
+
+class AuthenticateviaSAML2KeystoneIdPTests(base.TestCase):
+
+    GROUP = 'auth'
+    TEST_TOKEN = uuid.uuid4().hex
+
+    def setUp(self):
+        super(AuthenticateviaSAML2KeystoneIdPTests, self).setUp()
+
+        self.ECP_SP_SAML2_REQUEST_HEADERS = {
+            'Content-Type': 'application/vnd.paos+xml'
+        }
+
+        self.PROTOCOL = 'saml2'
+        self.SP_URL = (
+            'https://openstack4.local'
+            'Shibboleth.sso/SAML2/ECP')
+        self.SP_AUTH_URL = (
+            'https://openstack4.local'
+            'OS-FEDERATION/identity_providers/testidp/protocols/saml2/auth')
+        self.ECP_ASSERTION = saml2_fixtures.SAML2_ASSERTION
+
+        self.saml2keystone = saml2.Saml2KeystoneUnscoped(
+            self.TEST_URL, self.SP_URL, self.SP_AUTH_URL, self.ECP_ASSERTION)
+
+    def test_end_to_end_workflow(self):
+        # The SP should respond with a 302
+        self.requests.register_uri(
+            'POST',
+            self.SP_URL,
+            content=self.ECP_ASSERTION,
+            status_code=302)
+
+        # Should not follow the redirect URL, but use the sp_auth_url attribute
+        self.requests.register_uri(
+            'GET',
+            self.SP_AUTH_URL,
+            json=saml2_fixtures.UNSCOPED_TOKEN,
+            headers={'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER})
+
+        response = self.saml2keystone.get_auth_ref(self.session)
+
+        # Check the internal attributes
+        token_json = self.saml2keystone.authenticated_response.json()['token']
+        token = self.saml2keystone.authenticated_response.headers[
+            'X-Subject-Token']
+        self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN['token'],
+                         token_json)
+        self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN_HEADER,
+                         token)
+
+        # Check the actual response
+        self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN_HEADER,
+                         response.auth_token)
