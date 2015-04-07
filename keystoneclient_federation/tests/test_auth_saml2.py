@@ -54,9 +54,6 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         def json(self):
             raise ValueError()
 
-    class _AuthentiatedResponseMissingTokenID(_AuthenticatedResponse):
-        headers = {}
-
     def setUp(self):
         super(AuthenticateviaSAML2Tests, self).setUp()
 
