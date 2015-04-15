@@ -20,7 +20,7 @@ from lxml import etree
 from oslo.config import cfg
 from six.moves import urllib
 
-from keystoneclient_federation.i18n import _
+from keystoneclient_saml2.i18n import _
 
 
 class _BaseSAMLPlugin(v3.AuthConstructor):

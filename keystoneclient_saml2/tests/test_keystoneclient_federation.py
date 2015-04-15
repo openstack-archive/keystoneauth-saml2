@@ -13,16 +13,16 @@
 # under the License.
 
 """
-test_keystoneclient_federation
+test_keystoneclient_saml2
 ----------------------------------
 
-Tests for `keystoneclient_federation` module.
+Tests for `keystoneclient_saml2` module.
 """
 
-from keystoneclient_federation.tests import base
+from keystoneclient_saml2.tests import base
 
 
-class TestKeystoneclient_federation(base.TestCase):
+class TestKeystoneclient_saml2(base.TestCase):
 
     def test_something(self):
         pass

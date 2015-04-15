@@ -16,4 +16,4 @@ import pbr.version
 
 
 __version__ = pbr.version.VersionInfo(
-    'keystoneclient_federation').version_string()
+    'keystoneclient_saml2').version_string()
