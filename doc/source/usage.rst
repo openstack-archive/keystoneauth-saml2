@@ -2,6 +2,6 @@
 Usage
 ========
 
-To use python-keystoneclient-federation in a project::
+To use python-keystoneclient-saml2 in a project::
 
-    import keystoneclient_federation
+    import keystoneclient_saml2

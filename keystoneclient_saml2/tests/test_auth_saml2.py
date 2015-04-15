@@ -18,10 +18,10 @@ from keystoneclient import exceptions
 from lxml import etree
 from six.moves import urllib
 
-from keystoneclient_federation.tests import base
-from keystoneclient_federation.tests import client_fixtures
-from keystoneclient_federation.tests import saml2_fixtures
-from keystoneclient_federation.v3 import saml2
+from keystoneclient_saml2.tests import base
+from keystoneclient_saml2.tests import client_fixtures
+from keystoneclient_saml2.tests import saml2_fixtures
+from keystoneclient_saml2.v3 import saml2
 
 ROOTDIR = os.path.dirname(os.path.abspath(__file__))
 XMLDIR = os.path.join(ROOTDIR, 'examples', 'xml/')

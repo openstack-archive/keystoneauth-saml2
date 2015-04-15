@@ -1,9 +1,9 @@
-.. python-keystoneclient-federation documentation master file, created by
+.. python-keystoneclient-saml2 documentation master file, created by
    sphinx-quickstart on Tue Jul  9 22:26:36 2013.
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to python-keystoneclient-federation's documentation!
+Welcome to python-keystoneclient-saml2's documentation!
 ========================================================
 
 Contents:
