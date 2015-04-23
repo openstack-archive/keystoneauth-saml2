@@ -74,10 +74,10 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         self.SHIB_CONSUMER_URL = ('https://openstack4.local/'
                                   'Shibboleth.sso/SAML2/ECP')
 
-        self.saml2plugin = saml2.Saml2UnscopedToken(
+        self.saml2plugin = saml2.Saml2Token(
             self.TEST_URL,
             self.IDENTITY_PROVIDER, self.IDENTITY_PROVIDER_URL,
-            self.TEST_USER, self.TEST_TOKEN)
+            self.TEST_USER, self.TEST_TOKEN, self.PROTOCOL)
 
     def test_conf_params(self):
         section = uuid.uuid4().hex
@@ -86,10 +86,10 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         username = uuid.uuid4().hex
         password = uuid.uuid4().hex
         self.register_conf_options(group=self.GROUP, section=section)
-        self.conf_fixture.register_opts(saml2.Saml2UnscopedToken.get_options(),
+        self.conf_fixture.register_opts(saml2.Saml2Token.get_options(),
                                         group=section)
 
-        self.conf_fixture.config(auth_plugin='v3unscopedsaml',
+        self.conf_fixture.config(auth_plugin='v3saml2',
                                  identity_provider=identity_provider,
                                  identity_provider_url=identity_provider_url,
                                  username=username,
@@ -153,10 +153,10 @@ class AuthenticateviaSAML2Tests(base.TestCase):
             headers={'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER,
                      'Content-Type': 'application/json'})
 
-        token, token_body = self.saml2plugin._get_unscoped_token(self.session)
-        self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN['token'], token_body)
+        token = self.saml2plugin.get_auth_ref(self.session)
 
-        self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN_HEADER, token)
+        self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN_HEADER,
+                         token.auth_token)
 
     def test_initial_sp_call_invalid_response(self):
         """Send initial SP HTTP request and receive wrong server response."""
@@ -203,7 +203,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
 
     def test_mising_username_password_in_plugin(self):
         self.assertRaises(TypeError,
-                          saml2.Saml2UnscopedToken,
+                          saml2.Saml2Token,
                           self.TEST_URL, self.IDENTITY_PROVIDER,
                           self.IDENTITY_PROVIDER_URL)
 
@@ -373,13 +373,6 @@ class ScopeFederationTokenTests(AuthenticateviaSAML2Tests):
         self.assertEqual(self.TEST_DOMAIN_ID, token.domain_id)
         self.assertEqual(self.TEST_DOMAIN_NAME, token.domain_name)
 
-    def test_dont_set_project_nor_domain(self):
-        self.saml2_scope_plugin.project_id = None
-        self.saml2_scope_plugin.domain_id = None
-        self.assertRaises(exceptions.ValidationError,
-                          saml2.Saml2ScopedToken,
-                          self.TEST_URL, client_fixtures.AUTH_SUBJECT_TOKEN)
-
 
 class AuthenticateviaADFSTests(base.TestCase):
 
@@ -412,6 +405,8 @@ class AuthenticateviaADFSTests(base.TestCase):
 
     TEST_TOKEN = uuid.uuid4().hex
 
+    PROTOCOL = 'saml2'
+
     @property
     def _uuid4(self):
         return '4b911420-4982-4009-8afc-5c596cd487f5'
@@ -429,10 +424,10 @@ class AuthenticateviaADFSTests(base.TestCase):
             'OS-FEDERATION/identity_providers/adfs/protocols/saml2/auth')
         self.SP_ENDPOINT = 'https://openstack4.local/Shibboleth.sso/ADFS'
 
-        self.adfsplugin = saml2.ADFSUnscopedToken(
+        self.adfsplugin = saml2.ADFSToken(
             self.TEST_URL, self.IDENTITY_PROVIDER,
             self.IDENTITY_PROVIDER_URL, self.SP_ENDPOINT,
-            self.TEST_USER, self.TEST_TOKEN)
+            self.TEST_USER, self.TEST_TOKEN, self.PROTOCOL)
 
         self.ADFS_SECURITY_TOKEN_RESPONSE = _load_xml(
             'ADFS_RequestSecurityTokenResponse.xml')
@@ -446,9 +441,9 @@ class AuthenticateviaADFSTests(base.TestCase):
         username = uuid.uuid4().hex
         password = uuid.uuid4().hex
         self.register_conf_options(group=self.GROUP, section=section)
-        self.conf_fixture.register_opts(saml2.ADFSUnscopedToken.get_options(),
+        self.conf_fixture.register_opts(saml2.ADFSToken.get_options(),
                                         group=section)
-        self.conf_fixture.config(auth_plugin='v3unscopedadfs',
+        self.conf_fixture.config(auth_plugin='v3adfs',
                                  identity_provider=identity_provider,
                                  identity_provider_url=identity_provider_url,
                                  service_provider_endpoint=sp_endpoint,
@@ -464,7 +459,7 @@ class AuthenticateviaADFSTests(base.TestCase):
         self.assertEqual(password, a.password)
 
     def test_get_adfs_security_token(self):
-        """Test ADFSUnscopedToken._get_adfs_security_token()."""
+        """Test ADFSToken._get_adfs_security_token()."""
 
         self.requests.register_uri(
             'POST', self.IDENTITY_PROVIDER_URL,
@@ -506,8 +501,8 @@ class AuthenticateviaADFSTests(base.TestCase):
     def test_prepare_sp_request(self):
         assertion = etree.XML(self.ADFS_SECURITY_TOKEN_RESPONSE)
         assertion = assertion.xpath(
-            saml2.ADFSUnscopedToken.ADFS_ASSERTION_XPATH,
-            namespaces=saml2.ADFSUnscopedToken.ADFS_TOKEN_NAMESPACES)
+            saml2.ADFSToken.ADFS_ASSERTION_XPATH,
+            namespaces=saml2.ADFSToken.ADFS_TOKEN_NAMESPACES)
         assertion = assertion[0]
         assertion = etree.tostring(assertion)
 
@@ -628,6 +623,5 @@ class AuthenticateviaADFSTests(base.TestCase):
         # NOTE(marek-denis): We need to mimic this until self.requests can
         # issue cookies properly.
         self.session.session.cookies = [object()]
-        token, token_json = self.adfsplugin._get_unscoped_token(self.session)
-        self.assertEqual(token, client_fixtures.AUTH_SUBJECT_TOKEN)
-        self.assertEqual(saml2_fixtures.UNSCOPED_TOKEN['token'], token_json)
+        token = self.adfsplugin.get_auth_ref(self.session)
+        self.assertEqual(client_fixtures.AUTH_SUBJECT_TOKEN, token.auth_token)
