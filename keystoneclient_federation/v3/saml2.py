@@ -80,11 +80,6 @@ class _BaseSAMLPlugin(federation.FederatedAuthPlugin):
         ])
         return options
 
-    @property
-    def scoped_token_plugin(self):
-        """Return class that should be used for scoping the token."""
-        return Saml2ScopedToken
-
     @staticmethod
     def _first(_list):
         if len(_list) != 1:
@@ -908,21 +903,3 @@ class ADFSToken(_BaseSAMLPlugin):
                 response=self.authenticated_response)
 
         return access.AccessInfoV3(token, **token_json)
-
-
-class Saml2ScopedTokenMethod(v3.TokenMethod):
-    _method_name = 'saml2'
-
-    def get_auth_data(self, session, auth, headers, **kwargs):
-        """Build and return request body for token scoping step."""
-
-        t = super(Saml2ScopedTokenMethod, self).get_auth_data(
-            session, auth, headers, **kwargs)
-        _token_method, token = t
-        return self._method_name, token
-
-
-class Saml2ScopedToken(v3.Token):
-    """Class for scoping unscoped saml2 token."""
-
-    _auth_method_class = Saml2ScopedTokenMethod
