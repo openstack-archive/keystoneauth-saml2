@@ -41,22 +41,6 @@ class AuthenticateviaSAML2Tests(base.TestCase):
     GROUP = 'auth'
     TEST_TOKEN = uuid.uuid4().hex
 
-    class _AuthenticatedResponse(object):
-        headers = {
-            'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER
-        }
-
-        def json(self):
-            return saml2_fixtures.UNSCOPED_TOKEN
-
-    class _AuthenticatedResponseInvalidJson(_AuthenticatedResponse):
-
-        def json(self):
-            raise ValueError()
-
-    class _AuthentiatedResponseMissingTokenID(_AuthenticatedResponse):
-        headers = {}
-
     def setUp(self):
         super(AuthenticateviaSAML2Tests, self).setUp()
 
