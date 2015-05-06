@@ -17,7 +17,7 @@ from keystoneclient import access
 from keystoneclient.auth.identity import v3
 from keystoneclient import exceptions
 from lxml import etree
-from oslo.config import cfg
+from oslo_config import cfg
 from six.moves import urllib
 
 from keystoneclient_saml2.i18n import _
