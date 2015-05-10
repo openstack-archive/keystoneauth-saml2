@@ -1,0 +1,9 @@
+Code-Review+2: Jamie Lennox <jamielennox@redhat.com>
+Code-Review+2: Brant Knudson <bknudson@us.ibm.com>
+Workflow+1: Brant Knudson <bknudson@us.ibm.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Sun, 10 May 2015 12:59:29 +0000
+Reviewed-on: https://review.openstack.org/180692
+Project: openstack/python-keystoneclient-saml2
+Branch: refs/heads/master
