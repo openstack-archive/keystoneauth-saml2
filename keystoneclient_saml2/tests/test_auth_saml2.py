@@ -13,8 +13,8 @@
 import os
 import uuid
 
-from keystoneclient import auth
-from keystoneclient import exceptions
+from keystoneauth import auth
+from keystoneauth import exceptions
 from lxml import etree
 from six.moves import urllib
 

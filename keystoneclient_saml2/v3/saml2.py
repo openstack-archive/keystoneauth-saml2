@@ -14,11 +14,10 @@ import datetime
 import logging
 import uuid
 
-from keystoneclient import access
-from keystoneclient.auth.identity import v3
-from keystoneclient.auth.identity.v3 import federated
-from keystoneclient import exceptions
-from keystoneclient.i18n import _
+from keystoneauth import access
+from keystoneauth.auth.identity import v3
+from keystoneauth.auth.identity.v3 import federation
+from keystoneauth import exceptions
 from lxml import etree
 from oslo_config import cfg
 from six.moves import urllib
@@ -27,7 +26,7 @@ from keystoneclient_saml2.i18n import _
 LOG = logging.getLogger(__name__)
 
 
-class _BaseSAMLPlugin(federated.FederatedBaseAuth):
+class _BaseSAMLPlugin(federation.FederationBaseAuth):
 
     HTTP_MOVED_TEMPORARILY = 302
 
