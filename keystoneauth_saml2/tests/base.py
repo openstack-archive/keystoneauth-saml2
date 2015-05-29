@@ -17,8 +17,8 @@
 
 import uuid
 
-from keystoneclient import auth
-from keystoneclient import session
+from keystoneauth1 import loading
+from keystoneauth1 import session
 from oslo_config import fixture as config
 from oslotest import base
 from requests_mock.contrib import fixture as requests_mock
@@ -42,10 +42,11 @@ class TestCase(base.BaseTestCase):
         self.session = session.Session()
 
     def register_conf_options(self, group=None, section=None):
-        auth.register_conf_options(self.conf_fixture.conf, group=group)
+        loading.register_auth_conf_options(self.conf_fixture.conf, group=group)
 
         if section:
             self.conf_fixture.config(group=group, auth_section=section)
-            auth.register_conf_options(self.conf_fixture.conf, group=group)
+            loading.register_auth_conf_options(self.conf_fixture.conf,
+                                               group=group)
 
         return self.conf_fixture
