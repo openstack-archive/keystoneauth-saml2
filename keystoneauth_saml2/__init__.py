@@ -12,17 +12,8 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
-"""
-test_keystoneclient_saml2
-----------------------------------
-
-Tests for `keystoneclient_saml2` module.
-"""
-
-from keystoneclient_saml2.tests import base
+import pbr.version
 
 
-class TestKeystoneclient_saml2(base.TestCase):
-
-    def test_something(self):
-        pass
+__version__ = pbr.version.VersionInfo(
+    'keystoneauth_saml2').version_string()
