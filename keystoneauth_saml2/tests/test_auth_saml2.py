@@ -13,15 +13,15 @@
 import os
 import uuid
 
-from keystoneclient import auth
-from keystoneclient import exceptions
+from keystoneauth1 import auth
+from keystoneauth1 import exceptions
 from lxml import etree
 from six.moves import urllib
 
-from keystoneclient_saml2.tests import base
-from keystoneclient_saml2.tests import client_fixtures
-from keystoneclient_saml2.tests import saml2_fixtures
-from keystoneclient_saml2.v3 import saml2
+from keystoneauth_saml2.tests import base
+from keystoneauth_saml2.tests import client_fixtures
+from keystoneauth_saml2.tests import saml2_fixtures
+from keystoneauth_saml2.v3 import saml2
 
 ROOTDIR = os.path.dirname(os.path.abspath(__file__))
 XMLDIR = os.path.join(ROOTDIR, 'examples', 'xml/')
@@ -242,7 +242,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         self.requests.register_uri('POST', self.SHIB_CONSUMER_URL)
         invalid_consumer_url = uuid.uuid4().hex
         self.assertRaises(
-            exceptions.ValidationError,
+            exceptions.AuthorizationFailure,
             self.saml2plugin._check_consumer_urls,
             self.session, self.SHIB_CONSUMER_URL,
             invalid_consumer_url)
@@ -540,7 +540,7 @@ class AuthenticateviaADFSTests(base.TestCase):
     def test_get_adfs_security_token_bad_response(self):
         """Test proper handling HTTP 500 and mangled (non XML) response.
 
-        This should never happen yet, keystoneclient should be prepared
+        This should never happen yet, keystoneauth should be prepared
         and correctly raise exceptions.InternalServerError once it cannot
         parse XML fault message
         """
