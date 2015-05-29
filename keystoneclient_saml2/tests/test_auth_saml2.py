@@ -13,8 +13,8 @@
 import os
 import uuid
 
-from keystoneclient import auth
-from keystoneclient import exceptions
+from keystoneauth import auth
+from keystoneauth import exceptions
 from lxml import etree
 from six.moves import urllib
 
@@ -242,7 +242,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         self.requests.register_uri('POST', self.SHIB_CONSUMER_URL)
         invalid_consumer_url = uuid.uuid4().hex
         self.assertRaises(
-            exceptions.ValidationError,
+            exceptions.AuthorizationFailure,
             self.saml2plugin._check_consumer_urls,
             self.session, self.SHIB_CONSUMER_URL,
             invalid_consumer_url)
