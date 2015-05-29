@@ -14,10 +14,10 @@ import datetime
 import logging
 import uuid
 
-from keystoneclient import access
-from keystoneclient.auth.identity import v3
-from keystoneclient.auth.identity.v3 import federated
-from keystoneclient import exceptions
+from keystoneauth1 import access
+from keystoneauth1.auth.identity import v3
+from keystoneauth1.auth.identity.v3 import federation
+from keystoneauth1 import exceptions
 from lxml import etree
 from oslo_config import cfg
 from six.moves import urllib
@@ -28,7 +28,7 @@ from keystoneclient_saml2.i18n import _
 LOG = logging.getLogger(__name__)
 
 
-class _BaseSAMLPlugin(federated.FederatedBaseAuth):
+class _BaseSAMLPlugin(federation.FederationBaseAuth):
 
     HTTP_MOVED_TEMPORARILY = 302
 
@@ -252,7 +252,7 @@ class Saml2Token(_BaseSAMLPlugin):
                 'idp_consumer_url': idp_sp_response_consumer_url
             }
 
-            raise exceptions.ValidationError(msg)
+            raise exceptions.AuthorizationFailure(msg)
 
     def _send_service_provider_request(self, session):
         """Initial HTTP GET request to the SAML2 protected endpoint.
@@ -438,10 +438,7 @@ class Saml2Token(_BaseSAMLPlugin):
             self._send_idp_saml2_authn_request(session)
             self._send_service_provider_saml2_authn_response(session)
 
-        token = self.authenticated_response.headers['X-Subject-Token']
-        token_json = self.authenticated_response.json()['token']
-
-        return access.AccessInfoV3(token, **token_json)
+        return access.create(resp=self.authenticated_response)
 
 
 class ADFSToken(_BaseSAMLPlugin):
@@ -859,14 +856,7 @@ class ADFSToken(_BaseSAMLPlugin):
         self._send_assertion_to_service_provider(session)
         self._access_service_provider(session)
 
-        try:
-            token = self.authenticated_response.headers['X-Subject-Token']
-            token_json = self.authenticated_response.json()['token']
-        except (KeyError, ValueError):
-            raise exceptions.InvalidResponse(
-                response=self.authenticated_response)
-
-        return access.AccessInfoV3(token, **token_json)
+        return access.create(resp=self.authenticated_response)
 
 
 class Saml2ScopedTokenMethod(v3.TokenMethod):
