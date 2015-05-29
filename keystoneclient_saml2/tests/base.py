@@ -17,8 +17,8 @@
 
 import uuid
 
-from keystoneclient import auth
-from keystoneclient import session
+from keystoneauth import auth
+from keystoneauth import session
 from oslo_config import fixture as config
 from oslotest import base
 from requests_mock.contrib import fixture as requests_mock
