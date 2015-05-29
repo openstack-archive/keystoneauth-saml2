@@ -2,6 +2,6 @@
 Usage
 ========
 
-To use python-keystoneclient-saml2 in a project::
+To use keystoneauth-saml2 in a project::
 
-    import keystoneclient_saml2
+    import keystoneauth_saml2
