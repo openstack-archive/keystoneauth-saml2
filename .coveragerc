@@ -1,7 +1,7 @@
 [run]
 branch = True
-source = keystoneclient_saml2
-omit = keystoneclient_saml2/tests/*,keystoneclient_saml2/openstack/*
+source = keystoneauth_saml2
+omit = keystoneauth_saml2/tests/*,keystoneauth_saml2/openstack/*
 
 [report]
 ignore_errors = True

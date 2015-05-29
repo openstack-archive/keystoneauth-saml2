@@ -13,15 +13,14 @@
 import os
 import uuid
 
-from keystoneclient import auth
-from keystoneclient import exceptions
+from keystoneauth1 import exceptions
 from lxml import etree
 from six.moves import urllib
 
-from keystoneclient_saml2.tests import base
-from keystoneclient_saml2.tests import client_fixtures
-from keystoneclient_saml2.tests import saml2_fixtures
-from keystoneclient_saml2.v3 import saml2
+from keystoneauth_saml2.tests import base
+from keystoneauth_saml2.tests import client_fixtures
+from keystoneauth_saml2.tests import saml2_fixtures
+from keystoneauth_saml2.v3 import saml2
 
 ROOTDIR = os.path.dirname(os.path.abspath(__file__))
 XMLDIR = os.path.join(ROOTDIR, 'examples', 'xml/')
@@ -78,29 +77,6 @@ class AuthenticateviaSAML2Tests(base.TestCase):
             self.TEST_URL,
             self.IDENTITY_PROVIDER, self.IDENTITY_PROVIDER_URL,
             self.TEST_USER, self.TEST_TOKEN, self.PROTOCOL)
-
-    def test_conf_params(self):
-        section = uuid.uuid4().hex
-        identity_provider = uuid.uuid4().hex
-        identity_provider_url = uuid.uuid4().hex
-        username = uuid.uuid4().hex
-        password = uuid.uuid4().hex
-        self.register_conf_options(group=self.GROUP, section=section)
-        self.conf_fixture.register_opts(saml2.Saml2Token.get_options(),
-                                        group=section)
-
-        self.conf_fixture.config(auth_plugin='v3saml2',
-                                 identity_provider=identity_provider,
-                                 identity_provider_url=identity_provider_url,
-                                 username=username,
-                                 password=password,
-                                 group=section)
-
-        a = auth.load_from_conf_options(self.conf_fixture.conf, self.GROUP)
-        self.assertEqual(identity_provider, a.identity_provider)
-        self.assertEqual(identity_provider_url, a.identity_provider_url)
-        self.assertEqual(username, a.username)
-        self.assertEqual(password, a.password)
 
     def test_initial_sp_call(self):
         """Test initial call, expect SOAP message."""
@@ -242,7 +218,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         self.requests.register_uri('POST', self.SHIB_CONSUMER_URL)
         invalid_consumer_url = uuid.uuid4().hex
         self.assertRaises(
-            exceptions.ValidationError,
+            exceptions.AuthorizationFailure,
             self.saml2plugin._check_consumer_urls,
             self.session, self.SHIB_CONSUMER_URL,
             invalid_consumer_url)
@@ -433,31 +409,6 @@ class AuthenticateviaADFSTests(base.TestCase):
             'ADFS_RequestSecurityTokenResponse.xml')
         self.ADFS_FAULT = _load_xml('ADFS_fault.xml')
 
-    def test_conf_params(self):
-        section = uuid.uuid4().hex
-        identity_provider = uuid.uuid4().hex
-        identity_provider_url = uuid.uuid4().hex
-        sp_endpoint = uuid.uuid4().hex
-        username = uuid.uuid4().hex
-        password = uuid.uuid4().hex
-        self.register_conf_options(group=self.GROUP, section=section)
-        self.conf_fixture.register_opts(saml2.ADFSToken.get_options(),
-                                        group=section)
-        self.conf_fixture.config(auth_plugin='v3adfs',
-                                 identity_provider=identity_provider,
-                                 identity_provider_url=identity_provider_url,
-                                 service_provider_endpoint=sp_endpoint,
-                                 username=username,
-                                 password=password,
-                                 group=section)
-
-        a = auth.load_from_conf_options(self.conf_fixture.conf, self.GROUP)
-        self.assertEqual(identity_provider, a.identity_provider)
-        self.assertEqual(identity_provider_url, a.identity_provider_url)
-        self.assertEqual(sp_endpoint, a.service_provider_endpoint)
-        self.assertEqual(username, a.username)
-        self.assertEqual(password, a.password)
-
     def test_get_adfs_security_token(self):
         """Test ADFSToken._get_adfs_security_token()."""
 
@@ -540,7 +491,7 @@ class AuthenticateviaADFSTests(base.TestCase):
     def test_get_adfs_security_token_bad_response(self):
         """Test proper handling HTTP 500 and mangled (non XML) response.
 
-        This should never happen yet, keystoneclient should be prepared
+        This should never happen yet, keystoneauth1 should be prepared
         and correctly raise exceptions.InternalServerError once it cannot
         parse XML fault message
         """
