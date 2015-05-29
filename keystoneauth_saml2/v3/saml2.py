@@ -14,19 +14,18 @@ import datetime
 import logging
 import uuid
 
-from keystoneclient import access
-from keystoneclient.auth.identity import v3
-from keystoneclient.auth.identity.v3 import federated
-from keystoneclient import exceptions
+from keystoneauth1 import access
+from keystoneauth1 import exceptions
+from keystoneauth1.identity import v3
+from keystoneauth1.identity.v3 import federation
 from lxml import etree
-from oslo_config import cfg
 from six.moves import urllib
 
 
 LOG = logging.getLogger(__name__)
 
 
-class _BaseSAMLPlugin(federated.FederatedBaseAuth):
+class _BaseSAMLPlugin(federation.FederationBaseAuth):
 
     HTTP_MOVED_TEMPORARILY = 302
 
@@ -70,18 +69,6 @@ class _BaseSAMLPlugin(federated.FederatedBaseAuth):
         self.identity_provider_url = identity_provider_url
         self.username = username
         self.password = password
-
-    @classmethod
-    def get_options(cls):
-        options = super(_BaseSAMLPlugin, cls).get_options()
-        options.extend([
-            cfg.StrOpt('identity-provider-url', dest='identity_provider_url',
-                       help="Identity Provider's URL"),
-            cfg.StrOpt('user-name', dest='username', help='Username',
-                       deprecated_name='username'),
-            cfg.StrOpt('password', help='Password')
-        ])
-        return options
 
     @property
     def scoped_token_plugin(self):
@@ -226,7 +213,7 @@ class Saml2Token(_BaseSAMLPlugin):
         authn process should be interrupted and the user should be warned.
 
         :param session: session object to send out HTTP requests.
-        :type session: keystoneclient.session.Session
+        :type session: keystoneauth1.session.Session
         :param sp_response_consumer_url: consumer URL issued by a SP
         :type  sp_response_consumer_url: string
         :param idp_sp_response_consumer_url: consumer URL issued by an IdP
@@ -250,7 +237,7 @@ class Saml2Token(_BaseSAMLPlugin):
                 'idp_consumer_url': idp_sp_response_consumer_url
             }
 
-            raise exceptions.ValidationError(msg)
+            raise exceptions.AuthorizationFailure(msg)
 
     def _send_service_provider_request(self, session):
         """Initial HTTP GET request to the SAML2 protected endpoint.
@@ -272,7 +259,7 @@ class Saml2Token(_BaseSAMLPlugin):
         Return True indicating the user was already authenticated.
 
         :param session: a session object to send out HTTP requests.
-        :type session: keystoneclient.session.Session
+        :type session: keystoneauth1.session.Session
 
         """
         sp_response = session.get(self.federated_token_url,
@@ -426,20 +413,17 @@ class Saml2Token(_BaseSAMLPlugin):
 
 
         :param session : a session object to send out HTTP requests.
-        :type session: keystoneclient.session.Session
+        :type session: keystoneauth1.session.Session
 
         :returns: AccessInfo
-        :rtype: :py:class:`keystoneclient.access.AccessInfo`
+        :rtype: :py:class:`keystoneauth1.access.AccessInfo`
         """
         saml_authenticated = self._send_service_provider_request(session)
         if not saml_authenticated:
             self._send_idp_saml2_authn_request(session)
             self._send_service_provider_saml2_authn_response(session)
 
-        token = self.authenticated_response.headers['X-Subject-Token']
-        token_json = self.authenticated_response.json()['token']
-
-        return access.AccessInfoV3(token, **token_json)
+        return access.create(resp=self.authenticated_response)
 
 
 class ADFSToken(_BaseSAMLPlugin):
@@ -504,20 +488,10 @@ class ADFSToken(_BaseSAMLPlugin):
 
         self.service_provider_endpoint = service_provider_endpoint
 
-    @classmethod
-    def get_options(cls):
-        options = super(ADFSToken, cls).get_options()
-
-        options.extend([
-            cfg.StrOpt('service-provider-endpoint',
-                       help="Service Provider's Endpoint")
-        ])
-        return options
-
     def _cookies(self, session):
         """Check if cookie jar is not empty.
 
-        keystoneclient.session.Session object doesn't have a cookies attribute.
+        keystoneauth1.session.Session object doesn't have a cookies attribute.
         We should then try fetching cookies from the underlying
         requests.Session object. If that fails too, there is something wrong
         and let Python raise the AttributeError.
@@ -540,9 +514,9 @@ class ADFSToken(_BaseSAMLPlugin):
         The method is going to be used for building ADFS Request Security
         Token message. Time interval between ``created`` and ``expires``
         dates is now static and equals to 120 seconds. ADFS security tokens
-        should not be live too long, as currently ``keystoneclient``
+        should not be live too long, as currently ``keystoneauth1``
         doesn't have mechanisms for reusing such tokens (every time ADFS authn
-        method is called, keystoneclient will login with the ADFS instance).
+        method is called, keystoneauth1 will login with the ADFS instance).
 
         :param fmt: Datetime format for specifying string format of a date.
                     It should not be changed if the method is going to be used
@@ -707,12 +681,12 @@ class ADFSToken(_BaseSAMLPlugin):
         ``exceptions.InternalServerError`` is re-raised.
 
         :param session : a session object to send out HTTP requests.
-        :type session: keystoneclient.session.Session
+        :type session: keystoneauth1.session.Session
 
-        :raises keystoneclient.exceptions.AuthorizationFailure: when HTTP
+        :raises keystoneauth1.exceptions.AuthorizationFailure: when HTTP
                  response from the ADFS server is not a valid XML ADFS security
                  token.
-        :raises keystoneclient.exceptions.InternalServerError: If response
+        :raises keystoneauth1.exceptions.InternalServerError: If response
                  status code is HTTP 500 and the response XML cannot be
                  recognized.
 
@@ -780,7 +754,7 @@ class ADFSToken(_BaseSAMLPlugin):
         the response which is required for entering a protected endpoint.
 
         :param session : a session object to send out HTTP requests.
-        :type session: keystoneclient.session.Session
+        :type session: keystoneauth1.session.Session
 
         :raises: Corresponding HTTP error exception
 
@@ -801,9 +775,9 @@ class ADFSToken(_BaseSAMLPlugin):
         is even made.
 
         :param session : a session object to send out HTTP requests.
-        :type session: keystoneclient.session.Session
+        :type session: keystoneauth1.session.Session
 
-        :raises keystoneclient.exceptions.AuthorizationFailure: in case session
+        :raises keystoneauth1.exceptions.AuthorizationFailure: in case session
         object has empty cookie jar.
 
         """
@@ -844,10 +818,10 @@ class ADFSToken(_BaseSAMLPlugin):
           ``ADFSToken._access_service_provider()`` method.
 
         :param session: a session object to send out HTTP requests.
-        :type session: keystoneclient.session.Session
+        :type session: keystoneauth1.session.Session
 
         :returns: AccessInfo
-        :rtype: :py:class:`keystoneclient.access.AccessInfo`
+        :rtype: :py:class:`keystoneauth1.access.AccessInfo`
 
         """
         self._prepare_adfs_request()
@@ -856,14 +830,7 @@ class ADFSToken(_BaseSAMLPlugin):
         self._send_assertion_to_service_provider(session)
         self._access_service_provider(session)
 
-        try:
-            token = self.authenticated_response.headers['X-Subject-Token']
-            token_json = self.authenticated_response.json()['token']
-        except (KeyError, ValueError):
-            raise exceptions.InvalidResponse(
-                response=self.authenticated_response)
-
-        return access.AccessInfoV3(token, **token_json)
+        return access.create(resp=self.authenticated_response)
 
 
 class Saml2ScopedTokenMethod(v3.TokenMethod):

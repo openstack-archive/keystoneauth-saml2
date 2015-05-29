@@ -22,7 +22,7 @@ See http://docs.openstack.org/developer/oslo.i18n/usage.html .
 import oslo_i18n as i18n
 
 
-_translators = i18n.TranslatorFactory(domain='keystoneclient-saml2')
+_translators = i18n.TranslatorFactory(domain='keystoneauth-saml2')
 
 # The primary translation function using the well-known name "_"
 _ = _translators.primary
