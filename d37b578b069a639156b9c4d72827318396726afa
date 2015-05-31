@@ -1,0 +1,8 @@
+Verified+2: Jenkins
+Code-Review+2: Morgan Fainberg <morgan.fainberg@gmail.com>
+Workflow+1: Morgan Fainberg <morgan.fainberg@gmail.com>
+Submitted-by: Jenkins
+Submitted-at: Sun, 31 May 2015 21:48:34 +0000
+Reviewed-on: https://review.openstack.org/161588
+Project: openstack/python-keystoneclient-saml2
+Branch: refs/heads/master
