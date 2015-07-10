@@ -1,4 +1,4 @@
 [gerrit]
 host=review.openstack.org
 port=29418
-project=openstack/python-keystoneclient-saml2.git
+project=openstack/keystoneauth-saml2.git
