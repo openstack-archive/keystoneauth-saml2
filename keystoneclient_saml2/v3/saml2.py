@@ -22,8 +22,6 @@ from lxml import etree
 from oslo_config import cfg
 from six.moves import urllib
 
-from keystoneclient_saml2.i18n import _
-
 
 LOG = logging.getLogger(__name__)
 
@@ -93,7 +91,7 @@ class _BaseSAMLPlugin(federated.FederatedBaseAuth):
     @staticmethod
     def _first(_list):
         if len(_list) != 1:
-            raise IndexError(_("Only single element list is acceptable"))
+            raise IndexError('Only single element list is acceptable')
         return _list[0]
 
     @staticmethod
@@ -116,8 +114,8 @@ class Saml2TokenAuthMethod(v3.AuthMethod):
     _method_parameters = []
 
     def get_auth_data(self, session, auth, headers, **kwargs):
-        raise exceptions.MethodNotImplemented(_('This method should never '
-                                                'be called'))
+        raise exceptions.MethodNotImplemented('This method should never '
+                                              'be called')
 
 
 class Saml2Token(_BaseSAMLPlugin):
@@ -242,9 +240,9 @@ class Saml2Token(_BaseSAMLPlugin):
                          authenticated=False)
 
             # prepare error message and raise an exception.
-            msg = _("Consumer URLs from Service Provider %(service_provider)s "
-                    "%(sp_consumer_url)s and Identity Provider "
-                    "%(identity_provider)s %(idp_consumer_url)s are not equal")
+            msg = ('Consumer URLs from Service Provider %(service_provider)s '
+                   '%(sp_consumer_url)s and Identity Provider '
+                   '%(identity_provider)s %(idp_consumer_url)s are not equal')
             msg = msg % {
                 'service_provider': self.federated_token_url,
                 'sp_consumer_url': sp_response_consumer_url,
@@ -288,8 +286,8 @@ class Saml2Token(_BaseSAMLPlugin):
         try:
             self.saml2_authn_request = etree.XML(sp_response.content)
         except etree.XMLSyntaxError as e:
-            msg = _("SAML2: Error parsing XML returned "
-                    "from Service Provider, reason: %s") % e
+            msg = ('SAML2: Error parsing XML returned '
+                   'from Service Provider, reason: %s') % e
             raise exceptions.AuthorizationFailure(msg)
 
         relay_state = self.saml2_authn_request.xpath(
@@ -319,8 +317,8 @@ class Saml2Token(_BaseSAMLPlugin):
         try:
             self.saml2_idp_authn_response = etree.XML(idp_response.content)
         except etree.XMLSyntaxError as e:
-            msg = _("SAML2: Error parsing XML returned "
-                    "from Identity Provider, reason: %s") % e
+            msg = ('SAML2: Error parsing XML returned '
+                   'from Identity Provider, reason: %s') % e
             raise exceptions.AuthorizationFailure(msg)
 
         idp_response_consumer_url = self.saml2_idp_authn_response.xpath(
@@ -744,8 +742,8 @@ class ADFSToken(_BaseSAMLPlugin):
         except exceptions.InternalServerError as e:
             reason = _get_failure(e)
             raise exceptions.AuthorizationFailure(reason)
-        msg = _("Error parsing XML returned from "
-                "the ADFS Identity Provider, reason: %s")
+        msg = ('Error parsing XML returned from '
+               'the ADFS Identity Provider, reason: %s')
         self.adfs_token = self.str_to_xml(response.content, msg)
 
     def _prepare_sp_request(self):
@@ -811,9 +809,8 @@ class ADFSToken(_BaseSAMLPlugin):
         """
         if self._cookies(session) is False:
             raise exceptions.AuthorizationFailure(
-                _("Session object doesn't contain a cookie, therefore you are "
-                  "not allowed to enter the Identity Provider's protected "
-                  "area."))
+                "Session object doesn't contain a cookie, therefore you are "
+                "not allowed to enter the Identity Provider's protected area.")
         self.authenticated_response = session.get(self.federated_token_url,
                                                   authenticated=False)
 
