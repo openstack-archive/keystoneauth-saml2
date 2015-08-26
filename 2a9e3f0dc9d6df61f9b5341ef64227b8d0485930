@@ -1,0 +1,8 @@
+Verified+2: Jenkins
+Code-Review+2: David Stanek <dstanek@dstanek.com>
+Workflow+1: David Stanek <dstanek@dstanek.com>
+Submitted-by: Jenkins
+Submitted-at: Wed, 26 Aug 2015 20:07:57 +0000
+Reviewed-on: https://review.openstack.org/217157
+Project: openstack/keystoneauth-saml2
+Branch: refs/heads/master
