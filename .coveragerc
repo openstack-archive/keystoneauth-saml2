@@ -4,4 +4,4 @@ source = keystoneclient_saml2
 omit = keystoneclient_saml2/tests/*,keystoneclient_saml2/openstack/*
 
 [report]
-ignore-errors = True
+ignore_errors = True
