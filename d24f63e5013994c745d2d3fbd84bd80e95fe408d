@@ -1,0 +1,12 @@
+Verified+2: Jenkins
+Code-Review+1: matthew wagoner <zxkuqyb@gmail.com>
+Code-Review+2: Brant Knudson <bknudson@us.ibm.com>
+Code-Review+2: Marek Denis <marek.denis@cern.ch>
+Workflow+1: Marek Denis <marek.denis@cern.ch>
+Code-Review+1: Alexander Makarov <amakarov@mirantis.com>
+Code-Review+1: venkatamahesh <venkatamaheshkotha@gmail.com>
+Submitted-by: Jenkins
+Submitted-at: Mon, 28 Sep 2015 08:58:46 +0000
+Reviewed-on: https://review.openstack.org/225741
+Project: openstack/keystoneauth-saml2
+Branch: refs/heads/master
