@@ -15,13 +15,27 @@
 # License for the specific language governing permissions and limitations
 # under the License.
 
+import os
 import uuid
 
 from keystoneauth1 import loading
 from keystoneauth1 import session
+from lxml import etree
 from oslo_config import fixture as config
 from oslotest import base
 from requests_mock.contrib import fixture as requests_mock
+
+ROOTDIR = os.path.dirname(os.path.abspath(__file__))
+XMLDIR = os.path.join(ROOTDIR, 'examples', 'xml/')
+
+
+def make_oneline(s):
+    return etree.tostring(etree.XML(s)).replace(b'\n', b'')
+
+
+def load_xml(filename):
+    with open(XMLDIR + filename, 'rb') as f:
+        return make_oneline(f.read())
 
 
 class TestCase(base.BaseTestCase):
