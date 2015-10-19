@@ -28,6 +28,7 @@ LOG = logging.getLogger(__name__)
 class _BaseSAMLPlugin(federation.FederationBaseAuth):
 
     HTTP_MOVED_TEMPORARILY = 302
+    HTTP_SEE_OTHER = 303
 
     def __init__(self, auth_url,
                  identity_provider, identity_provider_url,
@@ -185,9 +186,9 @@ class Saml2Token(_BaseSAMLPlugin):
     </S:Envelope>
     """
 
-    def _handle_http_302_ecp_redirect(self, session, response, method,
-                                      **kwargs):
-        if response.status_code != self.HTTP_MOVED_TEMPORARILY:
+    def _handle_http_ecp_redirect(self, session, response, method, **kwargs):
+        if response.status_code not in (self.HTTP_MOVED_TEMPORARILY,
+                                        self.HTTP_SEE_OTHER):
             return response
 
         location = response.headers['location']
@@ -337,11 +338,11 @@ class Saml2Token(_BaseSAMLPlugin):
             data=etree.tostring(self.saml2_idp_authn_response),
             authenticated=False, redirect=False)
 
-        # Don't follow HTTP specs - after the HTTP 302 response don't repeat
-        # the call directed to the Location URL. In this case, this is an
-        # indication that saml2 session is now active and protected resource
+        # Don't follow HTTP specs - after the HTTP 302/303 response don't
+        # repeat the call directed to the Location URL. In this case, this is
+        # an indication that saml2 session is now active and protected resource
         # can be accessed.
-        response = self._handle_http_302_ecp_redirect(
+        response = self._handle_http_ecp_redirect(
             session, response, method='GET',
             headers=self.ECP_SP_SAML2_REQUEST_HEADERS)
 
