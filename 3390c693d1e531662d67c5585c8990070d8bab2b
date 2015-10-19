@@ -1,0 +1,9 @@
+Verified+2: Jenkins
+Code-Review+2: guang-yee <guang.yee@hpe.com>
+Code-Review+2: Jamie Lennox <jamielennox@redhat.com>
+Workflow+1: Jamie Lennox <jamielennox@redhat.com>
+Submitted-by: Jenkins
+Submitted-at: Mon, 19 Oct 2015 01:03:29 +0000
+Reviewed-on: https://review.openstack.org/177227
+Project: openstack/keystoneauth-saml2
+Branch: refs/heads/master
