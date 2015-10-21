@@ -52,7 +52,7 @@ class TestCase(base.BaseTestCase):
         super(TestCase, self).setUp()
         self.conf_fixture = self.useFixture(config.Config())
 
-        self.requests = self.useFixture(requests_mock.Fixture())
+        self.requests_mock = self.useFixture(requests_mock.Fixture())
         self.session = session.Session()
 
     def register_conf_options(self, group=None, section=None):

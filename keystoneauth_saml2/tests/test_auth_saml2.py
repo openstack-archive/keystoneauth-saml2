@@ -65,8 +65,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
 
     def test_initial_sp_call(self):
         """Test initial call, expect SOAP message."""
-        self.requests.register_uri(
-            'GET',
+        self.requests_mock.get(
             self.FEDERATION_AUTH_URL,
             content=base.make_oneline(saml2_fixtures.SP_SOAP_RESPONSE))
         a = self.saml2plugin._send_service_provider_request(self.session)
@@ -91,8 +90,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
                 str(self.saml2plugin.sp_response_consumer_url)))
 
     def test_initial_sp_call_when_saml_authenticated(self):
-        self.requests.register_uri(
-            'GET',
+        self.requests_mock.get(
             self.FEDERATION_AUTH_URL,
             json=saml2_fixtures.UNSCOPED_TOKEN,
             headers={'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER})
@@ -107,8 +105,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
             self.saml2plugin.authenticated_response.headers['X-Subject-Token'])
 
     def test_get_unscoped_token_when_authenticated(self):
-        self.requests.register_uri(
-            'GET',
+        self.requests_mock.get(
             self.FEDERATION_AUTH_URL,
             json=saml2_fixtures.UNSCOPED_TOKEN,
             headers={'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER,
@@ -121,9 +118,8 @@ class AuthenticateviaSAML2Tests(base.TestCase):
 
     def test_initial_sp_call_invalid_response(self):
         """Send initial SP HTTP request and receive wrong server response."""
-        self.requests.register_uri('GET',
-                                   self.FEDERATION_AUTH_URL,
-                                   text='NON XML RESPONSE')
+        self.requests_mock.get(self.FEDERATION_AUTH_URL,
+                               text='NON XML RESPONSE')
 
         self.assertRaises(
             exceptions.AuthorizationFailure,
@@ -131,9 +127,8 @@ class AuthenticateviaSAML2Tests(base.TestCase):
             self.session)
 
     def test_send_authn_req_to_idp(self):
-        self.requests.register_uri('POST',
-                                   self.IDENTITY_PROVIDER_URL,
-                                   content=saml2_fixtures.SAML2_ASSERTION)
+        self.requests_mock.post(self.IDENTITY_PROVIDER_URL,
+                                content=saml2_fixtures.SAML2_ASSERTION)
 
         self.saml2plugin.sp_response_consumer_url = self.SHIB_CONSUMER_URL
         self.saml2plugin.saml2_authn_request = etree.XML(
@@ -150,9 +145,8 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         self.assertEqual(idp_response, saml2_assertion_oneline, error)
 
     def test_fail_basicauth_idp_authentication(self):
-        self.requests.register_uri('POST',
-                                   self.IDENTITY_PROVIDER_URL,
-                                   status_code=401)
+        self.requests_mock.post(self.IDENTITY_PROVIDER_URL,
+                                status_code=401)
 
         self.saml2plugin.sp_response_consumer_url = self.SHIB_CONSUMER_URL
         self.saml2plugin.saml2_authn_request = etree.XML(
@@ -169,8 +163,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
                           self.IDENTITY_PROVIDER_URL)
 
     def test_send_authn_response_to_sp(self):
-        self.requests.register_uri(
-            'POST',
+        self.requests_mock.post(
             self.SHIB_CONSUMER_URL,
             json=saml2_fixtures.UNSCOPED_TOKEN,
             headers={'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER})
@@ -200,7 +193,7 @@ class AuthenticateviaSAML2Tests(base.TestCase):
             self.SHIB_CONSUMER_URL)
 
     def test_consumer_url_mismatch(self):
-        self.requests.register_uri('POST', self.SHIB_CONSUMER_URL)
+        self.requests_mock.post(self.SHIB_CONSUMER_URL)
         invalid_consumer_url = uuid.uuid4().hex
         self.assertRaises(
             exceptions.AuthorizationFailure,
@@ -209,15 +202,12 @@ class AuthenticateviaSAML2Tests(base.TestCase):
             invalid_consumer_url)
 
     def test_custom_302_redirection(self):
-        self.requests.register_uri(
-            'POST',
-            self.SHIB_CONSUMER_URL,
-            text='BODY',
-            headers={'location': self.FEDERATION_AUTH_URL},
-            status_code=302)
+        self.requests_mock.post(self.SHIB_CONSUMER_URL,
+                                text='BODY',
+                                headers={'location': self.FEDERATION_AUTH_URL},
+                                status_code=302)
 
-        self.requests.register_uri(
-            'GET',
+        self.requests_mock.get(
             self.FEDERATION_AUTH_URL,
             json=saml2_fixtures.UNSCOPED_TOKEN,
             headers={'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER})
@@ -236,15 +226,12 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         self.assertEqual('GET', response.request.method)
 
     def test_custom_303_redirection(self):
-        self.requests.register_uri(
-            'POST',
-            self.SHIB_CONSUMER_URL,
-            text='BODY',
-            headers={'location': self.FEDERATION_AUTH_URL},
-            status_code=303)
+        self.requests_mock.post(self.SHIB_CONSUMER_URL,
+                                text='BODY',
+                                headers={'location': self.FEDERATION_AUTH_URL},
+                                status_code=303)
 
-        self.requests.register_uri(
-            'GET',
+        self.requests_mock.get(
             self.FEDERATION_AUTH_URL,
             json=saml2_fixtures.UNSCOPED_TOKEN,
             headers={'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER})
@@ -263,17 +250,14 @@ class AuthenticateviaSAML2Tests(base.TestCase):
         self.assertEqual('GET', response.request.method)
 
     def test_end_to_end_workflow(self):
-        self.requests.register_uri(
-            'GET',
+        self.requests_mock.get(
             self.FEDERATION_AUTH_URL,
             content=base.make_oneline(saml2_fixtures.SP_SOAP_RESPONSE))
 
-        self.requests.register_uri('POST',
-                                   self.IDENTITY_PROVIDER_URL,
-                                   content=saml2_fixtures.SAML2_ASSERTION)
+        self.requests_mock.post(self.IDENTITY_PROVIDER_URL,
+                                content=saml2_fixtures.SAML2_ASSERTION)
 
-        self.requests.register_uri(
-            'POST',
+        self.requests_mock.post(
             self.SHIB_CONSUMER_URL,
             json=saml2_fixtures.UNSCOPED_TOKEN,
             headers={'X-Subject-Token': saml2_fixtures.UNSCOPED_TOKEN_HEADER,

@@ -84,8 +84,8 @@ class AuthenticateviaADFSTests(base.TestCase):
     def test_get_adfs_security_token(self):
         """Test ADFSToken._get_adfs_security_token()."""
 
-        self.requests.register_uri(
-            'POST', self.IDENTITY_PROVIDER_URL,
+        self.requests_mock.post(
+            self.IDENTITY_PROVIDER_URL,
             content=base.make_oneline(self.ADFS_SECURITY_TOKEN_RESPONSE),
             status_code=200)
 
@@ -147,10 +147,9 @@ class AuthenticateviaADFSTests(base.TestCase):
         An exceptions.AuthorizationFailure should be raised including
         error message from the XML message indicating where was the problem.
         """
-        self.requests.register_uri('POST',
-                                   self.IDENTITY_PROVIDER_URL,
-                                   content=base.make_oneline(self.ADFS_FAULT),
-                                   status_code=500)
+        self.requests_mock.post(self.IDENTITY_PROVIDER_URL,
+                                content=base.make_oneline(self.ADFS_FAULT),
+                                status_code=500)
 
         self.adfsplugin._prepare_adfs_request()
         self.assertRaises(exceptions.AuthorizationFailure,
@@ -167,10 +166,9 @@ class AuthenticateviaADFSTests(base.TestCase):
         and correctly raise exceptions.InternalServerError once it cannot
         parse XML fault message
         """
-        self.requests.register_uri('POST',
-                                   self.IDENTITY_PROVIDER_URL,
-                                   content=b'NOT XML',
-                                   status_code=500)
+        self.requests_mock.post(self.IDENTITY_PROVIDER_URL,
+                                content=b'NOT XML',
+                                status_code=500)
         self.adfsplugin._prepare_adfs_request()
         self.assertRaises(exceptions.InternalServerError,
                           self.adfsplugin._get_adfs_security_token,
@@ -182,9 +180,9 @@ class AuthenticateviaADFSTests(base.TestCase):
         """Test whether SP issues a cookie."""
         cookie = uuid.uuid4().hex
 
-        self.requests.register_uri('POST', self.SP_ENDPOINT,
-                                   headers={"set-cookie": cookie},
-                                   status_code=302)
+        self.requests_mock.post(self.SP_ENDPOINT,
+                                headers={"set-cookie": cookie},
+                                status_code=302)
 
         self.adfsplugin.adfs_token = self._build_adfs_request()
         self.adfsplugin._prepare_sp_request()
@@ -193,8 +191,7 @@ class AuthenticateviaADFSTests(base.TestCase):
         self.assertEqual(1, len(self.session.session.cookies))
 
     def test_send_assertion_to_service_provider_bad_status(self):
-        self.requests.register_uri('POST', self.SP_ENDPOINT,
-                                   status_code=500)
+        self.requests_mock.post(self.SP_ENDPOINT, status_code=500)
 
         self.adfsplugin.adfs_token = etree.XML(
             self.ADFS_SECURITY_TOKEN_RESPONSE)
@@ -214,8 +211,8 @@ class AuthenticateviaADFSTests(base.TestCase):
                           self.session)
 
     def test_check_valid_token_when_authenticated(self):
-        self.requests.register_uri(
-            'GET', self.FEDERATION_AUTH_URL,
+        self.requests_mock.get(
+            self.FEDERATION_AUTH_URL,
             json=saml2_fixtures.UNSCOPED_TOKEN,
             headers=client_fixtures.AUTH_RESPONSE_HEADERS)
 
@@ -230,16 +227,14 @@ class AuthenticateviaADFSTests(base.TestCase):
                          response.json()['token'])
 
     def test_end_to_end_workflow(self):
-        self.requests.register_uri(
-            'POST', self.IDENTITY_PROVIDER_URL,
-            content=self.ADFS_SECURITY_TOKEN_RESPONSE,
-            status_code=200)
-        self.requests.register_uri(
-            'POST', self.SP_ENDPOINT,
-            headers={"set-cookie": 'x'},
-            status_code=302)
-        self.requests.register_uri(
-            'GET', self.FEDERATION_AUTH_URL,
+        self.requests_mock.post(self.IDENTITY_PROVIDER_URL,
+                                content=self.ADFS_SECURITY_TOKEN_RESPONSE,
+                                status_code=200)
+        self.requests_mock.post(self.SP_ENDPOINT,
+                                headers={"set-cookie": 'x'},
+                                status_code=302)
+        self.requests_mock.get(
+            self.FEDERATION_AUTH_URL,
             json=saml2_fixtures.UNSCOPED_TOKEN,
             headers=client_fixtures.AUTH_RESPONSE_HEADERS)
 
