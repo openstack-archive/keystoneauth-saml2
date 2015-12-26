@@ -1,0 +1,8 @@
+Code-Review+2: Steve Martinelli <stevemar@ca.ibm.com>
+Workflow+1: Steve Martinelli <stevemar@ca.ibm.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Sat, 26 Dec 2015 08:38:10 +0000
+Reviewed-on: https://review.openstack.org/261673
+Project: openstack/keystoneauth-saml2
+Branch: refs/heads/master
