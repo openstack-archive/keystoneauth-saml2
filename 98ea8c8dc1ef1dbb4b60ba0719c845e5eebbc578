@@ -1,0 +1,10 @@
+Code-Review+1: Andreas Jaeger <jaegerandi@gmail.com>
+Code-Review+2: Brant Knudson <bknudson@us.ibm.com>
+Code-Review+2: Morgan Fainberg <morgan.fainberg@gmail.com>
+Workflow+1: Morgan Fainberg <morgan.fainberg@gmail.com>
+Verified+2: Jenkins
+Submitted-by: Jenkins
+Submitted-at: Tue, 29 Dec 2015 20:29:24 +0000
+Reviewed-on: https://review.openstack.org/261819
+Project: openstack/keystoneauth-saml2
+Branch: refs/heads/master
