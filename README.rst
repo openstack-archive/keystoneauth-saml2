@@ -1,12 +1,15 @@
-This project is no longer mantained.
+==================
+keystoneauth-saml2
+==================
 
-The contents of this repository are still available in the Git
-source code management system.  To see the contents of this
-repository before it reached its end of life, please check out the
-previous commit with "git checkout HEAD^1".
+Federation plugins and helpers for the OpenStack clients.
 
-For an alternative project, please see keystoneauth.
+* Free software: Apache license
+* Documentation: http://docs.openstack.org/developer/keystoneauth-saml2
+* Source: https://git.openstack.org/cgit/openstack/keystoneauth-saml2
+* Bugs: https://bugs.launchpad.net/keystoneauth
 
-For any further questions, please email
-openstack-dev@lists.openstack.org or join #openstack-dev on
-Freenode.
+Features
+--------
+
+* TODO
